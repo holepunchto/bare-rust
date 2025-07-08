@@ -1,0 +1,8 @@
+[package]
+name = "bare-rust"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+bare-rust-ffi = { path = "../bare-rust-ffi" }
