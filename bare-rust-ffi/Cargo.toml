@@ -2,3 +2,6 @@
 name = "bare-rust-ffi"
 version = "0.0.0"
 edition = "2024"
+license = "Apache-2.0"
+description = "Low-level Rust FFI bindings for Bare"
+repository = "https://github.com/holepunchto/bare-rust"
