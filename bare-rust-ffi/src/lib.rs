@@ -1038,4 +1038,78 @@ unsafe extern "C" {
         index: u32,
         result: *mut bool,
     ) -> c_int;
+
+    pub fn js_get_callback_info(
+        env: *mut js_env_t,
+        info: *const js_callback_info_t,
+        argc: *mut usize,
+        argv: *mut *mut js_value_t,
+        receiver: *mut *mut js_value_t,
+        data: *mut *mut c_void,
+    ) -> c_int;
+
+    pub fn js_get_new_target(
+        env: *mut js_env_t,
+        info: *const js_callback_info_t,
+        result: *mut *mut js_value_t,
+    ) -> c_int;
+
+    pub fn js_get_arraybuffer_info(
+        env: *mut js_env_t,
+        arraybuffer: *mut js_value_t,
+        data: *mut *mut c_void,
+        len: *mut usize,
+    ) -> c_int;
+
+    pub fn js_get_sharedarraybuffer_info(
+        env: *mut js_env_t,
+        sharedarraybuffer: *mut js_value_t,
+        data: *mut *mut c_void,
+        len: *mut usize,
+    ) -> c_int;
+
+    pub fn js_get_typedarray_info(
+        env: *mut js_env_t,
+        typedarray: *mut js_value_t,
+        type_: *mut js_typedarray_type_t,
+        data: *mut *mut c_void,
+        len: *mut usize,
+        arraybuffer: *mut *mut js_value_t,
+        offset: *mut usize,
+    ) -> c_int;
+
+    pub fn js_get_dataview_info(
+        env: *mut js_env_t,
+        dataview: *mut js_value_t,
+        data: *mut *mut c_void,
+        len: *mut usize,
+        arraybuffer: *mut *mut js_value_t,
+        offset: *mut usize,
+    ) -> c_int;
+
+    pub fn js_call_function(
+        env: *mut js_env_t,
+        receiver: *mut js_value_t,
+        function: *mut js_value_t,
+        argc: usize,
+        argv: *const *mut js_value_t,
+        result: *mut *mut js_value_t,
+    ) -> c_int;
+
+    pub fn js_call_function_with_checkpoint(
+        env: *mut js_env_t,
+        receiver: *mut js_value_t,
+        function: *mut js_value_t,
+        argc: usize,
+        argv: *const *mut js_value_t,
+        result: *mut *mut js_value_t,
+    ) -> c_int;
+
+    pub fn js_new_instance(
+        env: *mut js_env_t,
+        constructor: *mut js_value_t,
+        argc: usize,
+        argv: *const *mut js_value_t,
+        result: *mut *mut js_value_t,
+    ) -> c_int;
 }

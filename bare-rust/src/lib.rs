@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use std::ffi::{c_void, CString};
 use std::ptr;
 
 pub use bare_rust_ffi as ffi;
@@ -164,6 +164,94 @@ impl From<String> for *mut js_value_t {
 }
 
 impl From<Value> for String {
+    fn from(value: Value) -> Self {
+        Self(value)
+    }
+}
+
+pub struct Callback {
+    pub argc: usize,
+}
+
+pub struct Function(Value);
+
+impl Function {
+    pub fn new<F, R>(env: &Env, function: F) -> Result<Function>
+    where
+        F: FnMut(&Env, &Callback) -> R,
+        R: Into<*mut js_value_t>,
+    {
+        let mut function = function;
+
+        let closure: Box<dyn FnMut(&Env, &Callback) -> *mut js_value_t> =
+            Box::new(move |env, info| function(env, info).into());
+
+        let data = Box::into_raw(Box::new(closure)) as *mut _;
+
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe {
+            js_create_function(
+                env.ptr,
+                ptr::null_mut(),
+                0,
+                Some(Function::call),
+                data,
+                &mut ptr,
+            )
+        };
+
+        if status != 0 {
+            return Err(status);
+        }
+
+        unsafe {
+            js_add_finalizer(
+                env.ptr,
+                ptr,
+                data,
+                Some(Function::drop),
+                ptr::null_mut(),
+                ptr::null_mut(),
+            );
+        }
+
+        Ok(Self(Value { env: env.ptr, ptr }))
+    }
+
+    extern "C" fn call(env: *mut js_env_t, info: *mut js_callback_info_t) -> *mut js_value_t {
+        let mut argc: usize = 0;
+        let mut data: *mut c_void = ptr::null_mut();
+
+        unsafe {
+            js_get_callback_info(
+                env,
+                info,
+                &mut argc,
+                ptr::null_mut(),
+                ptr::null_mut(),
+                &mut data,
+            );
+        }
+
+        let closure: &mut Box<dyn FnMut(&Env, &Callback) -> *mut js_value_t> =
+            unsafe { &mut *(data as *mut Box<dyn FnMut(&Env, &Callback) -> *mut js_value_t>) };
+
+        return closure(&Env::from(env), &Callback { argc });
+    }
+
+    extern "C" fn drop(_: *mut js_env_t, data: *mut c_void, _: *mut c_void) -> () {
+        let _: Box<Box<dyn FnMut(&Env, &Callback)>> = unsafe { Box::from_raw(data as *mut _) };
+    }
+}
+
+impl From<Function> for *mut js_value_t {
+    fn from(function: Function) -> Self {
+        function.0.ptr
+    }
+}
+
+impl From<Value> for Function {
     fn from(value: Value) -> Self {
         Self(value)
     }
