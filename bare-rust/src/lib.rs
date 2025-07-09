@@ -89,7 +89,7 @@ pub struct Boolean(pub Value);
 
 impl Boolean {
     pub fn new(env: &Env, value: bool) -> Result<Self> {
-        let mut ptr: *mut js_value_t = ptr::boolean_mut();
+        let mut ptr: *mut js_value_t = ptr::null_mut();
 
         let status = unsafe { js_get_boolean(env.ptr, value, &mut ptr) };
 
