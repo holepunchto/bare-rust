@@ -143,7 +143,9 @@ impl String {
 
         len += 1;
 
-        let mut result = Vec::with_capacity(len);
+        let mut result = Vec::new();
+
+        result.resize(len, 0);
 
         let status = unsafe {
             js_get_value_string_utf8(self.0.env, self.0.ptr, result.as_mut_ptr(), len, &mut len)
@@ -170,7 +172,35 @@ impl From<Value> for String {
 }
 
 pub struct Callback {
-    pub argc: usize,
+    env: *mut js_env_t,
+    args: Vec<*mut js_value_t>,
+    receiver: *mut js_value_t,
+}
+
+impl Callback {
+    pub fn arg<T>(&self, i: usize) -> Option<T>
+    where
+        T: From<Value>,
+    {
+        if i < self.args.len() {
+            Some(T::from(Value {
+                env: self.env,
+                ptr: self.args[i],
+            }))
+        } else {
+            None
+        }
+    }
+
+    pub fn receiver<T>(&self) -> T
+    where
+        T: From<Value>,
+    {
+        T::from(Value {
+            env: self.env,
+            ptr: self.receiver,
+        })
+    }
 }
 
 pub struct Function(Value);
@@ -220,24 +250,49 @@ impl Function {
     }
 
     extern "C" fn call(env: *mut js_env_t, info: *mut js_callback_info_t) -> *mut js_value_t {
-        let mut argc: usize = 0;
+        let mut len: usize = 0;
+        let mut receiver: *mut js_value_t = ptr::null_mut();
         let mut data: *mut c_void = ptr::null_mut();
 
         unsafe {
             js_get_callback_info(
                 env,
                 info,
-                &mut argc,
+                &mut len,
                 ptr::null_mut(),
-                ptr::null_mut(),
+                &mut receiver,
                 &mut data,
             );
+        }
+
+        let mut args = Vec::new();
+
+        args.resize(len, ptr::null_mut());
+
+        if len > 0 {
+            unsafe {
+                js_get_callback_info(
+                    env,
+                    info,
+                    &mut len,
+                    args.as_mut_ptr(),
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                );
+            }
         }
 
         let closure: &mut Box<dyn FnMut(&Env, &Callback) -> *mut js_value_t> =
             unsafe { &mut *(data as *mut Box<dyn FnMut(&Env, &Callback) -> *mut js_value_t>) };
 
-        return closure(&Env::from(env), &Callback { argc });
+        return closure(
+            &Env::from(env),
+            &Callback {
+                env,
+                args,
+                receiver,
+            },
+        );
     }
 
     extern "C" fn drop(_: *mut js_env_t, data: *mut c_void, _: *mut c_void) -> () {
