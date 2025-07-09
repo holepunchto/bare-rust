@@ -131,15 +131,11 @@ impl String {
         }
     }
 
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         let mut len = 0;
 
-        let status = unsafe {
-            js_get_value_string_utf8(self.0.env, self.0.ptr, ptr::null_mut(), 0, &mut len)
-        };
-
-        if status != 0 {
-            return Err(status);
+        unsafe {
+            js_get_value_string_utf8(self.0.env, self.0.ptr, ptr::null_mut(), 0, &mut len);
         }
 
         len += 1;
@@ -148,15 +144,11 @@ impl String {
 
         result.resize(len, 0);
 
-        let status = unsafe {
-            js_get_value_string_utf8(self.0.env, self.0.ptr, result.as_mut_ptr(), len, &mut len)
-        };
-
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(result)
+        unsafe {
+            js_get_value_string_utf8(self.0.env, self.0.ptr, result.as_mut_ptr(), len, &mut len);
         }
+
+        result
     }
 }
 
