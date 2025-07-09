@@ -7,55 +7,55 @@ use std::os::raw::{c_char, c_double, c_int, c_uchar};
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct js_env_t {
-    _private: [u8; 0],
+    _private: (),
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct js_handle_scope_t {
-    _private: [u8; 0],
+    _private: (),
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct js_escapable_handle_scope_t {
-    _private: [u8; 0],
+    _private: (),
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct js_context_t {
-    _private: [u8; 0],
+    _private: (),
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct js_value_t {
-    _private: [u8; 0],
+    _private: (),
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct js_ref_t {
-    _private: [u8; 0],
+    _private: (),
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct js_deferred_t {
-    _private: [u8; 0],
+    _private: (),
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct js_callback_info_t {
-    _private: [u8; 0],
+    _private: (),
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct js_arraybuffer_backing_store_t {
-    _private: [u8; 0],
+    _private: (),
 }
 
 #[repr(C)]
