@@ -1,5 +1,6 @@
 use std::ffi::{c_void, CString};
 use std::ptr;
+use std::slice;
 
 pub use bare_rust_ffi as ffi;
 
@@ -206,7 +207,7 @@ impl Callback {
 pub struct Function(Value);
 
 impl Function {
-    pub fn new<F, R>(env: &Env, function: F) -> Result<Function>
+    pub fn new<F, R>(env: &Env, function: F) -> Result<Self>
     where
         F: FnMut(&Env, &Callback) -> R,
         R: Into<*mut js_value_t>,
@@ -307,6 +308,109 @@ impl From<Function> for *mut js_value_t {
 }
 
 impl From<Value> for Function {
+    fn from(value: Value) -> Self {
+        Self(value)
+    }
+}
+
+pub struct ArrayBuffer(Value);
+
+impl ArrayBuffer {
+    pub fn new(env: &Env, len: usize) -> Result<Self> {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_create_arraybuffer(env.ptr, len, ptr::null_mut(), &mut ptr) };
+
+        if status != 0 {
+            Err(status)
+        } else {
+            Ok(Self(Value { env: env.ptr, ptr }))
+        }
+    }
+
+    pub fn as_mut_slice(&self) -> &mut [u8] {
+        let mut len: usize = 0;
+        let mut data: *mut c_void = ptr::null_mut();
+
+        unsafe {
+            js_get_arraybuffer_info(self.0.env, self.0.ptr, &mut data, &mut len);
+        }
+
+        unsafe { slice::from_raw_parts_mut(data as *mut u8, len) }
+    }
+}
+
+impl From<ArrayBuffer> for *mut js_value_t {
+    fn from(arraybuffer: ArrayBuffer) -> Self {
+        arraybuffer.0.ptr
+    }
+}
+
+impl From<Value> for ArrayBuffer {
+    fn from(value: Value) -> Self {
+        Self(value)
+    }
+}
+
+pub trait TypedArray<T> {
+    fn as_mut_slice(&self) -> &mut [T];
+}
+
+pub struct Uint8Array(Value);
+
+impl Uint8Array {
+    pub fn new(env: &Env, len: usize) -> Result<Self> {
+        let arraybuffer = ArrayBuffer::new(env, len)?;
+
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe {
+            js_create_typedarray(
+                env.ptr,
+                js_typedarray_type_t::js_uint8array,
+                len,
+                arraybuffer.0.ptr,
+                0,
+                &mut ptr,
+            )
+        };
+
+        if status != 0 {
+            Err(status)
+        } else {
+            Ok(Self(Value { env: env.ptr, ptr }))
+        }
+    }
+}
+
+impl TypedArray<u8> for Uint8Array {
+    fn as_mut_slice(&self) -> &mut [u8] {
+        let mut len: usize = 0;
+        let mut data: *mut c_void = ptr::null_mut();
+
+        unsafe {
+            js_get_typedarray_info(
+                self.0.env,
+                self.0.ptr,
+                ptr::null_mut(),
+                &mut data,
+                &mut len,
+                ptr::null_mut(),
+                ptr::null_mut(),
+            );
+        }
+
+        unsafe { slice::from_raw_parts_mut(data as *mut u8, len) }
+    }
+}
+
+impl From<Uint8Array> for *mut js_value_t {
+    fn from(uint8array: Uint8Array) -> Self {
+        uint8array.0.ptr
+    }
+}
+
+impl From<Value> for Uint8Array {
     fn from(value: Value) -> Self {
         Self(value)
     }
