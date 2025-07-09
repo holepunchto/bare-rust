@@ -123,6 +123,110 @@ impl From<Value> for Boolean {
     }
 }
 
+pub struct Number(pub Value);
+
+impl Number {
+    pub fn with_i32(env: &Env, value: i32) -> Result<Self> {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_create_int32(env.ptr, value, &mut ptr) };
+
+        if status != 0 {
+            Err(status)
+        } else {
+            Ok(Self(Value { env: env.ptr, ptr }))
+        }
+    }
+
+    pub fn with_u32(env: &Env, value: u32) -> Result<Self> {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_create_uint32(env.ptr, value, &mut ptr) };
+
+        if status != 0 {
+            Err(status)
+        } else {
+            Ok(Self(Value { env: env.ptr, ptr }))
+        }
+    }
+
+    pub fn with_i64(env: &Env, value: i64) -> Result<Self> {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_create_int64(env.ptr, value, &mut ptr) };
+
+        if status != 0 {
+            Err(status)
+        } else {
+            Ok(Self(Value { env: env.ptr, ptr }))
+        }
+    }
+
+    pub fn with_f64(env: &Env, value: f64) -> Result<Self> {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_create_double(env.ptr, value, &mut ptr) };
+
+        if status != 0 {
+            Err(status)
+        } else {
+            Ok(Self(Value { env: env.ptr, ptr }))
+        }
+    }
+}
+
+impl From<Number> for i32 {
+    fn from(number: Number) -> Self {
+        let mut value = 0;
+
+        unsafe { js_get_value_int32(number.0.env, number.0.ptr, &mut value); }
+
+        value
+    }
+}
+
+impl From<Number> for u32 {
+    fn from(number: Number) -> Self {
+        let mut value = 0;
+
+        unsafe { js_get_value_uint32(number.0.env, number.0.ptr, &mut value); }
+
+        value
+    }
+}
+
+impl From<Number> for i64 {
+    fn from(number: Number) -> Self {
+        let mut value = 0;
+
+        unsafe { js_get_value_int64(number.0.env, number.0.ptr, &mut value); }
+
+        value
+    }
+}
+
+impl From<Number> for f64 {
+    fn from(number: Number) -> Self {
+        let mut value = 0.0;
+
+        unsafe { js_get_value_double(number.0.env, number.0.ptr, &mut value); }
+
+        value
+    }
+}
+
+impl From<Number> for *mut js_value_t {
+    fn from(number: Number) -> Self {
+        number.0.ptr
+    }
+}
+
+impl From<Value> for Number {
+    fn from(value: Value) -> Self {
+        Self(value)
+    }
+}
+
 pub struct String(pub Value);
 
 impl String {
