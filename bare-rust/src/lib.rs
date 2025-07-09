@@ -320,6 +320,10 @@ impl ArrayBuffer {
         }
     }
 
+    pub fn as_slice(&self) -> &[u8] {
+        self.as_mut_slice()
+    }
+
     pub fn as_mut_slice(&self) -> &mut [u8] {
         let mut len: usize = 0;
         let mut data: *mut c_void = ptr::null_mut();
@@ -345,6 +349,7 @@ impl From<Value> for ArrayBuffer {
 }
 
 pub trait TypedArray<T> {
+    fn as_slice(&self) -> &[T];
     fn as_mut_slice(&self) -> &mut [T];
 }
 
@@ -376,6 +381,10 @@ impl Uint8Array {
 }
 
 impl TypedArray<u8> for Uint8Array {
+    fn as_slice(&self) -> &[u8] {
+        self.as_mut_slice()
+    }
+
     fn as_mut_slice(&self) -> &mut [u8] {
         let mut len: usize = 0;
         let mut data: *mut c_void = ptr::null_mut();
