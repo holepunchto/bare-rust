@@ -29,6 +29,145 @@ impl From<Value> for *mut js_value_t {
     }
 }
 
+pub struct Undefined(pub Value);
+
+impl Undefined {
+    pub fn new(env: &Env) -> Result<Self> {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_get_undefined(env.ptr, &mut ptr) };
+
+        if status != 0 {
+            Err(status)
+        } else {
+            Ok(Self(Value { env: env.ptr, ptr }))
+        }
+    }
+}
+
+impl From<Undefined> for *mut js_value_t {
+    fn from(undefined: Undefined) -> Self {
+        undefined.0.ptr
+    }
+}
+
+impl From<Value> for Undefined {
+    fn from(value: Value) -> Self {
+        Self(value)
+    }
+}
+
+pub struct Null(pub Value);
+
+impl Null {
+    pub fn new(env: &Env) -> Result<Self> {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_get_null(env.ptr, &mut ptr) };
+
+        if status != 0 {
+            Err(status)
+        } else {
+            Ok(Self(Value { env: env.ptr, ptr }))
+        }
+    }
+}
+
+impl From<Null> for *mut js_value_t {
+    fn from(null: Null) -> Self {
+        null.0.ptr
+    }
+}
+
+impl From<Value> for Null {
+    fn from(value: Value) -> Self {
+        Self(value)
+    }
+}
+
+pub struct Boolean(pub Value);
+
+impl Boolean {
+    pub fn new(env: &Env, value: bool) -> Result<Self> {
+        let mut ptr: *mut js_value_t = ptr::boolean_mut();
+
+        let status = unsafe { js_get_boolean(env.ptr, value, &mut ptr) };
+
+        if status != 0 {
+            Err(status)
+        } else {
+            Ok(Self(Value { env: env.ptr, ptr }))
+        }
+    }
+}
+
+impl From<Boolean> for *mut js_value_t {
+    fn from(boolean: Boolean) -> Self {
+        boolean.0.ptr
+    }
+}
+
+impl From<Value> for Boolean {
+    fn from(value: Value) -> Self {
+        Self(value)
+    }
+}
+
+pub struct String(pub Value);
+
+impl String {
+    pub fn new(env: &Env, value: &str) -> Result<Self> {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe {
+            js_create_string_utf8(
+                env.ptr,
+                value.as_ptr().cast(),
+                value.len() as usize,
+                &mut ptr,
+            )
+        };
+
+        if status != 0 {
+            Err(status)
+        } else {
+            Ok(Self(Value { env: env.ptr, ptr }))
+        }
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut len = 0;
+
+        unsafe {
+            js_get_value_string_utf8(self.0.env, self.0.ptr, ptr::null_mut(), 0, &mut len);
+        }
+
+        len += 1;
+
+        let mut result = Vec::new();
+
+        result.resize(len, 0);
+
+        unsafe {
+            js_get_value_string_utf8(self.0.env, self.0.ptr, result.as_mut_ptr(), len, &mut len);
+        }
+
+        result
+    }
+}
+
+impl From<String> for *mut js_value_t {
+    fn from(string: String) -> Self {
+        string.0.ptr
+    }
+}
+
+impl From<Value> for String {
+    fn from(value: Value) -> Self {
+        Self(value)
+    }
+}
+
 pub struct Object(pub Value);
 
 impl Object {
@@ -104,61 +243,6 @@ impl From<Object> for *mut js_value_t {
 }
 
 impl From<Value> for Object {
-    fn from(value: Value) -> Self {
-        Self(value)
-    }
-}
-
-pub struct String(pub Value);
-
-impl String {
-    pub fn new(env: &Env, value: &str) -> Result<Self> {
-        let mut ptr: *mut js_value_t = ptr::null_mut();
-
-        let status = unsafe {
-            js_create_string_utf8(
-                env.ptr,
-                value.as_ptr().cast(),
-                value.len() as usize,
-                &mut ptr,
-            )
-        };
-
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
-        }
-    }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut len = 0;
-
-        unsafe {
-            js_get_value_string_utf8(self.0.env, self.0.ptr, ptr::null_mut(), 0, &mut len);
-        }
-
-        len += 1;
-
-        let mut result = Vec::new();
-
-        result.resize(len, 0);
-
-        unsafe {
-            js_get_value_string_utf8(self.0.env, self.0.ptr, result.as_mut_ptr(), len, &mut len);
-        }
-
-        result
-    }
-}
-
-impl From<String> for *mut js_value_t {
-    fn from(string: String) -> Self {
-        string.0.ptr
-    }
-}
-
-impl From<Value> for String {
     fn from(value: Value) -> Self {
         Self(value)
     }
