@@ -101,6 +101,16 @@ impl Boolean {
     }
 }
 
+impl From<Boolean> for bool {
+    fn from(boolean: Boolean) -> Self {
+        let mut value = false;
+
+        unsafe { js_get_value_bool(boolean.0.env, boolean.0.ptr, &mut value); }
+
+        value
+    }
+}
+
 impl From<Boolean> for *mut js_value_t {
     fn from(boolean: Boolean) -> Self {
         boolean.0.ptr
