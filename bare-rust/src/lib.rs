@@ -1,6 +1,7 @@
 use std::ffi::{c_void, CString};
 use std::ptr;
 use std::slice;
+use std::string;
 
 pub use bare_rust_ffi as ffi;
 
@@ -256,8 +257,6 @@ impl String {
             js_get_value_string_utf8(self.0.env, self.0.ptr, ptr::null_mut(), 0, &mut len);
         }
 
-        len += 1;
-
         let mut result = Vec::new();
 
         result.resize(len, 0);
@@ -267,6 +266,12 @@ impl String {
         }
 
         result
+    }
+}
+
+impl From<String> for string::String {
+    fn from(string: String) -> Self {
+        return string::String::from_utf8(string.to_bytes()).unwrap();
     }
 }
 
