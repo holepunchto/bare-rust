@@ -1,5 +1,6 @@
 use std::ffi::{c_void, CString};
 use std::ptr;
+use std::result;
 use std::slice;
 use std::string;
 
@@ -17,7 +18,7 @@ macro_rules! check_status {
     };
 }
 
-pub type Result<T> = std::result::Result<T, Value>;
+type Result<T> = result::Result<T, Value>;
 
 #[derive(Debug)]
 pub struct Env {
@@ -64,6 +65,28 @@ impl From<Value> for *mut js_value_t {
     }
 }
 
+macro_rules! value_conversions {
+    ($type: ident) => {
+        impl From<$type> for *mut js_value_t {
+            fn from(value: $type) -> Self {
+                value.0.ptr
+            }
+        }
+
+        impl From<$type> for Value {
+            fn from(value: $type) -> Self {
+                value.0
+            }
+        }
+
+        impl From<Value> for $type {
+            fn from(value: Value) -> Self {
+                Self(value)
+            }
+        }
+    };
+}
+
 #[derive(Debug)]
 pub struct Undefined(Value);
 
@@ -79,17 +102,7 @@ impl Undefined {
     }
 }
 
-impl From<Undefined> for *mut js_value_t {
-    fn from(undefined: Undefined) -> Self {
-        undefined.0.ptr
-    }
-}
-
-impl From<Value> for Undefined {
-    fn from(value: Value) -> Self {
-        Self(value)
-    }
-}
+value_conversions!(Undefined);
 
 #[derive(Debug)]
 pub struct Null(Value);
@@ -106,17 +119,7 @@ impl Null {
     }
 }
 
-impl From<Null> for *mut js_value_t {
-    fn from(null: Null) -> Self {
-        null.0.ptr
-    }
-}
-
-impl From<Value> for Null {
-    fn from(value: Value) -> Self {
-        Self(value)
-    }
-}
+value_conversions!(Null);
 
 #[derive(Debug)]
 pub struct Boolean(Value);
@@ -133,6 +136,8 @@ impl Boolean {
     }
 }
 
+value_conversions!(Boolean);
+
 impl From<Boolean> for bool {
     fn from(boolean: Boolean) -> Self {
         let mut value = false;
@@ -142,18 +147,6 @@ impl From<Boolean> for bool {
         }
 
         value
-    }
-}
-
-impl From<Boolean> for *mut js_value_t {
-    fn from(boolean: Boolean) -> Self {
-        boolean.0.ptr
-    }
-}
-
-impl From<Value> for Boolean {
-    fn from(value: Value) -> Self {
-        Self(value)
     }
 }
 
@@ -201,6 +194,8 @@ impl Number {
         Self(Value { env: env.ptr, ptr })
     }
 }
+
+value_conversions!(Number);
 
 impl From<Number> for i32 {
     fn from(number: Number) -> Self {
@@ -250,18 +245,6 @@ impl From<Number> for f64 {
     }
 }
 
-impl From<Number> for *mut js_value_t {
-    fn from(number: Number) -> Self {
-        number.0.ptr
-    }
-}
-
-impl From<Value> for Number {
-    fn from(value: Value) -> Self {
-        Self(value)
-    }
-}
-
 #[derive(Debug)]
 pub struct BigInt(Value);
 
@@ -287,6 +270,8 @@ impl BigInt {
     }
 }
 
+value_conversions!(BigInt);
+
 impl From<BigInt> for i64 {
     fn from(bigint: BigInt) -> Self {
         let mut value = 0;
@@ -311,26 +296,10 @@ impl From<BigInt> for u64 {
     }
 }
 
-impl From<BigInt> for *mut js_value_t {
-    fn from(bigint: BigInt) -> Self {
-        bigint.0.ptr
-    }
-}
-
-impl From<Value> for BigInt {
-    fn from(value: Value) -> Self {
-        Self(value)
-    }
-}
-
 #[derive(Debug)]
 pub struct Name(Value);
 
-impl From<Name> for *mut js_value_t {
-    fn from(name: Name) -> Self {
-        name.0.ptr
-    }
-}
+value_conversions!(Name);
 
 impl From<String> for Name {
     fn from(string: String) -> Self {
@@ -361,17 +330,7 @@ impl Symbol {
     }
 }
 
-impl From<Symbol> for *mut js_value_t {
-    fn from(symbol: Symbol) -> Self {
-        symbol.0.ptr
-    }
-}
-
-impl From<Value> for Symbol {
-    fn from(value: Value) -> Self {
-        Self(value)
-    }
-}
+value_conversions!(Symbol);
 
 #[derive(Debug)]
 pub struct String(Value);
@@ -413,21 +372,11 @@ impl String {
     }
 }
 
+value_conversions!(String);
+
 impl From<String> for string::String {
     fn from(string: String) -> Self {
         return string::String::from_utf8(string.to_bytes()).unwrap();
-    }
-}
-
-impl From<String> for *mut js_value_t {
-    fn from(string: String) -> Self {
-        string.0.ptr
-    }
-}
-
-impl From<Value> for String {
-    fn from(value: Value) -> Self {
-        Self(value)
     }
 }
 
@@ -452,11 +401,10 @@ impl Object {
     {
         let env = Env::from(self.0.env);
 
-        let name = N::into(name);
-
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
-        let status = unsafe { js_get_property(self.0.env, self.0.ptr, name.0.ptr, &mut ptr) };
+        let status =
+            unsafe { js_get_property(self.0.env, self.0.ptr, name.into().0.ptr, &mut ptr) };
 
         check_status!(env, status);
 
@@ -502,11 +450,10 @@ impl Object {
     {
         let env = Env::from(self.0.env);
 
-        let name = N::into(name);
-
         let mut result = false;
 
-        let status = unsafe { js_has_property(self.0.env, self.0.ptr, name.0.ptr, &mut result) };
+        let status =
+            unsafe { js_has_property(self.0.env, self.0.ptr, name.into().0.ptr, &mut result) };
 
         check_status!(env, status);
 
@@ -519,12 +466,10 @@ impl Object {
     {
         let env = Env::from(self.0.env);
 
-        let name = N::into(name);
-
         let mut result = false;
 
         let status =
-            unsafe { js_has_own_property(self.0.env, self.0.ptr, name.0.ptr, &mut result) };
+            unsafe { js_has_own_property(self.0.env, self.0.ptr, name.into().0.ptr, &mut result) };
 
         check_status!(env, status);
 
@@ -565,9 +510,8 @@ impl Object {
     {
         let env = Env::from(self.0.env);
 
-        let name = N::into(name);
-
-        let status = unsafe { js_set_property(self.0.env, self.0.ptr, name.0.ptr, T::into(value)) };
+        let status =
+            unsafe { js_set_property(self.0.env, self.0.ptr, name.into().0.ptr, value.into()) };
 
         check_status!(env, status);
 
@@ -583,7 +527,7 @@ impl Object {
         let key = CString::new(name).unwrap();
 
         let status =
-            unsafe { js_set_named_property(self.0.env, self.0.ptr, key.as_ptr(), T::into(value)) };
+            unsafe { js_set_named_property(self.0.env, self.0.ptr, key.as_ptr(), value.into()) };
 
         check_status!(env, status);
 
@@ -596,7 +540,7 @@ impl Object {
     {
         let env = Env::from(self.0.env);
 
-        let status = unsafe { js_set_element(self.0.env, self.0.ptr, index, T::into(value)) };
+        let status = unsafe { js_set_element(self.0.env, self.0.ptr, index, value.into()) };
 
         check_status!(env, status);
 
@@ -609,11 +553,10 @@ impl Object {
     {
         let env = Env::from(self.0.env);
 
-        let name = N::into(name);
-
         let mut result = false;
 
-        let status = unsafe { js_delete_property(self.0.env, self.0.ptr, name.0.ptr, &mut result) };
+        let status =
+            unsafe { js_delete_property(self.0.env, self.0.ptr, name.into().0.ptr, &mut result) };
 
         check_status!(env, status);
 
@@ -648,17 +591,7 @@ impl Object {
     }
 }
 
-impl From<Object> for *mut js_value_t {
-    fn from(object: Object) -> Self {
-        object.0.ptr
-    }
-}
-
-impl From<Value> for Object {
-    fn from(value: Value) -> Self {
-        Self(value)
-    }
-}
+value_conversions!(Object);
 
 #[derive(Debug)]
 pub struct Array(Value);
@@ -705,7 +638,7 @@ impl Array {
     {
         let env = Env::from(self.0.env);
 
-        let status = unsafe { js_set_element(self.0.env, self.0.ptr, index, T::into(value)) };
+        let status = unsafe { js_set_element(self.0.env, self.0.ptr, index, value.into()) };
 
         check_status!(env, status);
 
@@ -713,17 +646,7 @@ impl Array {
     }
 }
 
-impl From<Array> for *mut js_value_t {
-    fn from(array: Array) -> Self {
-        array.0.ptr
-    }
-}
-
-impl From<Value> for Array {
-    fn from(value: Value) -> Self {
-        Self(value)
-    }
-}
+value_conversions!(Array);
 
 #[derive(Debug)]
 pub struct Callback {
@@ -762,10 +685,9 @@ impl Callback {
 pub struct Function(Value);
 
 impl Function {
-    pub fn new<F, R>(env: &Env, function: F) -> Result<Self>
+    pub fn new<F>(env: &Env, function: F) -> Result<Self>
     where
-        F: FnMut(&Env, &Callback) -> Result<R>,
-        R: Into<*mut js_value_t>,
+        F: FnMut(&Env, &Callback) -> Result<Value>,
     {
         let mut function = function;
 
@@ -774,7 +696,7 @@ impl Function {
                 Ok(result) => result.into(),
                 Err(error) => {
                     unsafe {
-                        js_throw(env.ptr, error.ptr);
+                        js_throw(env.ptr, error.into());
                     }
 
                     ptr::null_mut()
@@ -865,17 +787,7 @@ impl Function {
     }
 }
 
-impl From<Function> for *mut js_value_t {
-    fn from(function: Function) -> Self {
-        function.0.ptr
-    }
-}
-
-impl From<Value> for Function {
-    fn from(value: Value) -> Self {
-        Self(value)
-    }
-}
+value_conversions!(Function);
 
 #[derive(Debug)]
 pub struct ArrayBuffer(Value);
@@ -907,17 +819,7 @@ impl ArrayBuffer {
     }
 }
 
-impl From<ArrayBuffer> for *mut js_value_t {
-    fn from(arraybuffer: ArrayBuffer) -> Self {
-        arraybuffer.0.ptr
-    }
-}
-
-impl From<Value> for ArrayBuffer {
-    fn from(value: Value) -> Self {
-        Self(value)
-    }
-}
+value_conversions!(ArrayBuffer);
 
 pub trait TypedArray<T> {
     fn as_slice(&self) -> &[T];
@@ -977,17 +879,7 @@ macro_rules! define_typedarray {
             }
         }
 
-        impl From<$name> for *mut js_value_t {
-            fn from(typedarray: $name) -> Self {
-                typedarray.0.ptr
-            }
-        }
-
-        impl From<Value> for $name {
-            fn from(value: Value) -> Self {
-                Self(value)
-            }
-        }
+        value_conversions!($name);
     };
 }
 
@@ -1022,17 +914,7 @@ macro_rules! define_error {
             }
         }
 
-        impl From<$name> for *mut js_value_t {
-            fn from(error: $name) -> Self {
-                error.0.ptr
-            }
-        }
-
-        impl From<Value> for $name {
-            fn from(value: Value) -> Self {
-                Self(value)
-            }
-        }
+        value_conversions!($name);
     };
 }
 
