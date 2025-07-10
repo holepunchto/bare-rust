@@ -661,6 +661,71 @@ impl From<Value> for Object {
 }
 
 #[derive(Debug)]
+pub struct Array(Value);
+
+impl Array {
+    pub fn new(env: &Env, len: usize) -> Result<Self> {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_create_array_with_length(env.ptr, len, &mut ptr) };
+
+        check_status!(env, status);
+
+        Ok(Self(Value { env: env.ptr, ptr }))
+    }
+
+    pub fn len(&self) -> u32 {
+        let mut len = 0;
+
+        unsafe {
+            js_get_array_length(self.0.env, self.0.ptr, &mut len);
+        }
+
+        len
+    }
+
+    pub fn get<T>(&self, index: u32) -> Result<T>
+    where
+        T: From<Value>,
+    {
+        let env = Env::from(self.0.env);
+
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_get_element(self.0.env, self.0.ptr, index, &mut ptr) };
+
+        check_status!(env, status);
+
+        Ok(T::from(Value { env: env.ptr, ptr }))
+    }
+
+    pub fn set<T>(&mut self, index: u32, value: T) -> Result<()>
+    where
+        T: Into<*mut js_value_t>,
+    {
+        let env = Env::from(self.0.env);
+
+        let status = unsafe { js_set_element(self.0.env, self.0.ptr, index, T::into(value)) };
+
+        check_status!(env, status);
+
+        Ok(())
+    }
+}
+
+impl From<Array> for *mut js_value_t {
+    fn from(array: Array) -> Self {
+        array.0.ptr
+    }
+}
+
+impl From<Value> for Array {
+    fn from(value: Value) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Debug)]
 pub struct Callback {
     env: *mut js_env_t,
     args: Vec<*mut js_value_t>,
