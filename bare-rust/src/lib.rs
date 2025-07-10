@@ -7,7 +7,7 @@ pub use bare_rust_ffi as ffi;
 
 use ffi::*;
 
-macro_rules! js_check_status {
+macro_rules! check_status {
     ($env:expr, $status:expr) => {
         if $status == JS_PENDING_EXCEPTION {
             return Err($env.pending_exception().unwrap());
@@ -333,7 +333,7 @@ impl String {
             )
         };
 
-        js_check_status!(env, status);
+        check_status!(env, status);
 
         Ok(Self(Value { env: env.ptr, ptr }))
     }
@@ -384,7 +384,7 @@ impl Object {
 
         let status = unsafe { js_create_object(env.ptr, &mut ptr) };
 
-        js_check_status!(env, status);
+        check_status!(env, status);
 
         Ok(Self(Value { env: env.ptr, ptr }))
     }
@@ -402,7 +402,7 @@ impl Object {
         let status =
             unsafe { js_get_named_property(self.0.env, self.0.ptr, key.as_ptr(), &mut ptr) };
 
-        js_check_status!(env, status);
+        check_status!(env, status);
 
         Ok(T::from(Value { env: env.ptr, ptr }))
     }
@@ -417,7 +417,7 @@ impl Object {
         let status =
             unsafe { js_has_named_property(self.0.env, self.0.ptr, key.as_ptr(), &mut result) };
 
-        js_check_status!(env, status);
+        check_status!(env, status);
 
         Ok(result)
     }
@@ -433,7 +433,7 @@ impl Object {
         let status =
             unsafe { js_set_named_property(self.0.env, self.0.ptr, key.as_ptr(), T::into(value)) };
 
-        js_check_status!(env, status);
+        check_status!(env, status);
 
         Ok(())
     }
@@ -522,7 +522,7 @@ impl Function {
             )
         };
 
-        js_check_status!(env, status);
+        check_status!(env, status);
 
         unsafe {
             js_add_finalizer(
@@ -610,7 +610,7 @@ impl ArrayBuffer {
 
         let status = unsafe { js_create_arraybuffer(env.ptr, len, ptr::null_mut(), &mut ptr) };
 
-        js_check_status!(env, status);
+        check_status!(env, status);
 
         Ok(Self(Value { env: env.ptr, ptr }))
     }
@@ -668,7 +668,7 @@ impl Uint8Array {
             )
         };
 
-        js_check_status!(env, status);
+        check_status!(env, status);
 
         Ok(Self(Value { env: env.ptr, ptr }))
     }
@@ -710,3 +710,41 @@ impl From<Value> for Uint8Array {
         Self(value)
     }
 }
+
+macro_rules! define_error {
+    ($name:ident, $create:ident) => {
+        pub struct $name(pub Value);
+
+        impl $name {
+            pub fn new(env: &Env, message: &str) -> Self {
+                let message = String::new(env, message).unwrap();
+
+                let mut ptr: *mut js_value_t = std::ptr::null_mut();
+
+                unsafe {
+                    $create(env.ptr, std::ptr::null_mut(), message.0.ptr, &mut ptr);
+                }
+
+                Self(Value { env: env.ptr, ptr })
+            }
+        }
+
+        impl From<$name> for *mut js_value_t {
+            fn from(error: $name) -> Self {
+                error.0.ptr
+            }
+        }
+
+        impl From<Value> for $name {
+            fn from(value: Value) -> Self {
+                Self(value)
+            }
+        }
+    };
+}
+
+define_error!(Error, js_create_error);
+define_error!(TypeError, js_create_type_error);
+define_error!(RangeError, js_create_range_error);
+define_error!(SyntaxError, js_create_syntax_error);
+define_error!(ReferenceError, js_create_reference_error);
