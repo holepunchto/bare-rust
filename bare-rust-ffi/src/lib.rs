@@ -1112,4 +1112,13 @@ unsafe extern "C" {
         argv: *const *mut js_value_t,
         result: *mut *mut js_value_t,
     ) -> c_int;
+
+    pub fn js_throw(env: *mut js_env_t, error: *mut js_value_t) -> c_int;
+
+    pub fn js_is_exception_pending(env: *mut js_env_t, result: *mut bool) -> c_int;
+
+    pub fn js_get_and_clear_last_exception(
+        env: *mut js_env_t,
+        result: *mut *mut js_value_t,
+    ) -> c_int;
 }

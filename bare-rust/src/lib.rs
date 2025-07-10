@@ -7,10 +7,37 @@ pub use bare_rust_ffi as ffi;
 
 use ffi::*;
 
-pub type Result<T> = std::result::Result<T, i32>;
+macro_rules! js_check_status {
+    ($env:expr, $status:expr) => {
+        if $status == JS_PENDING_EXCEPTION {
+            return Err($env.pending_exception().unwrap());
+        } else if $status != 0 {
+            panic!("Uncaught JavaScript exception");
+        }
+    };
+}
 
+pub type Result<T> = std::result::Result<T, Value>;
+
+#[derive(Debug)]
 pub struct Env {
     ptr: *mut js_env_t,
+}
+
+impl Env {
+    pub fn pending_exception(&self) -> Option<Value> {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        unsafe {
+            js_get_and_clear_last_exception(self.ptr, &mut ptr);
+        }
+
+        if ptr.is_null() {
+            None
+        } else {
+            Some(Value { env: self.ptr, ptr })
+        }
+    }
 }
 
 impl From<*mut js_env_t> for Env {
@@ -19,6 +46,7 @@ impl From<*mut js_env_t> for Env {
     }
 }
 
+#[derive(Debug)]
 pub struct Value {
     env: *mut js_env_t,
     ptr: *mut js_value_t,
@@ -30,19 +58,18 @@ impl From<Value> for *mut js_value_t {
     }
 }
 
+#[derive(Debug)]
 pub struct Undefined(pub Value);
 
 impl Undefined {
-    pub fn new(env: &Env) -> Result<Self> {
+    pub fn new(env: &Env) -> Self {
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
-        let status = unsafe { js_get_undefined(env.ptr, &mut ptr) };
-
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
+        unsafe {
+            js_get_undefined(env.ptr, &mut ptr);
         }
+
+        Self(Value { env: env.ptr, ptr })
     }
 }
 
@@ -58,19 +85,18 @@ impl From<Value> for Undefined {
     }
 }
 
+#[derive(Debug)]
 pub struct Null(pub Value);
 
 impl Null {
-    pub fn new(env: &Env) -> Result<Self> {
+    pub fn new(env: &Env) -> Self {
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
-        let status = unsafe { js_get_null(env.ptr, &mut ptr) };
-
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
+        unsafe {
+            js_get_null(env.ptr, &mut ptr);
         }
+
+        Self(Value { env: env.ptr, ptr })
     }
 }
 
@@ -86,19 +112,18 @@ impl From<Value> for Null {
     }
 }
 
+#[derive(Debug)]
 pub struct Boolean(pub Value);
 
 impl Boolean {
-    pub fn new(env: &Env, value: bool) -> Result<Self> {
+    pub fn new(env: &Env, value: bool) -> Self {
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
-        let status = unsafe { js_get_boolean(env.ptr, value, &mut ptr) };
-
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
+        unsafe {
+            js_get_boolean(env.ptr, value, &mut ptr);
         }
+
+        Self(Value { env: env.ptr, ptr })
     }
 }
 
@@ -126,55 +151,48 @@ impl From<Value> for Boolean {
     }
 }
 
+#[derive(Debug)]
 pub struct Number(pub Value);
 
 impl Number {
-    pub fn with_i32(env: &Env, value: i32) -> Result<Self> {
+    pub fn with_i32(env: &Env, value: i32) -> Self {
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
-        let status = unsafe { js_create_int32(env.ptr, value, &mut ptr) };
-
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
+        unsafe {
+            js_create_int32(env.ptr, value, &mut ptr);
         }
+
+        Self(Value { env: env.ptr, ptr })
     }
 
-    pub fn with_u32(env: &Env, value: u32) -> Result<Self> {
+    pub fn with_u32(env: &Env, value: u32) -> Self {
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
-        let status = unsafe { js_create_uint32(env.ptr, value, &mut ptr) };
-
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
+        unsafe {
+            js_create_uint32(env.ptr, value, &mut ptr);
         }
+
+        Self(Value { env: env.ptr, ptr })
     }
 
-    pub fn with_i64(env: &Env, value: i64) -> Result<Self> {
+    pub fn with_i64(env: &Env, value: i64) -> Self {
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
-        let status = unsafe { js_create_int64(env.ptr, value, &mut ptr) };
-
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
+        unsafe {
+            js_create_int64(env.ptr, value, &mut ptr);
         }
+
+        Self(Value { env: env.ptr, ptr })
     }
 
-    pub fn with_f64(env: &Env, value: f64) -> Result<Self> {
+    pub fn with_f64(env: &Env, value: f64) -> Self {
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
-        let status = unsafe { js_create_double(env.ptr, value, &mut ptr) };
-
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
+        unsafe {
+            js_create_double(env.ptr, value, &mut ptr);
         }
+
+        Self(Value { env: env.ptr, ptr })
     }
 }
 
@@ -238,31 +256,28 @@ impl From<Value> for Number {
     }
 }
 
+#[derive(Debug)]
 pub struct BigInt(pub Value);
 
 impl BigInt {
-    pub fn with_i64(env: &Env, value: i64) -> Result<Self> {
+    pub fn with_i64(env: &Env, value: i64) -> Self {
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
-        let status = unsafe { js_create_bigint_int64(env.ptr, value, &mut ptr) };
-
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
+        unsafe {
+            js_create_bigint_int64(env.ptr, value, &mut ptr);
         }
+
+        Self(Value { env: env.ptr, ptr })
     }
 
-    pub fn with_u64(env: &Env, value: u64) -> Result<Self> {
+    pub fn with_u64(env: &Env, value: u64) -> Self {
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
-        let status = unsafe { js_create_bigint_uint64(env.ptr, value, &mut ptr) };
-
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
+        unsafe {
+            js_create_bigint_uint64(env.ptr, value, &mut ptr);
         }
+
+        Self(Value { env: env.ptr, ptr })
     }
 }
 
@@ -302,6 +317,7 @@ impl From<Value> for BigInt {
     }
 }
 
+#[derive(Debug)]
 pub struct String(pub Value);
 
 impl String {
@@ -317,11 +333,9 @@ impl String {
             )
         };
 
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
-        }
+        js_check_status!(env, status);
+
+        Ok(Self(Value { env: env.ptr, ptr }))
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -361,6 +375,7 @@ impl From<Value> for String {
     }
 }
 
+#[derive(Debug)]
 pub struct Object(pub Value);
 
 impl Object {
@@ -369,17 +384,17 @@ impl Object {
 
         let status = unsafe { js_create_object(env.ptr, &mut ptr) };
 
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
-        }
+        js_check_status!(env, status);
+
+        Ok(Self(Value { env: env.ptr, ptr }))
     }
 
     pub fn get_named_property<T>(&self, name: &str) -> Result<T>
     where
         T: From<Value>,
     {
+        let env = Env::from(self.0.env);
+
         let key = CString::new(name).unwrap();
 
         let mut ptr: *mut js_value_t = ptr::null_mut();
@@ -387,17 +402,14 @@ impl Object {
         let status =
             unsafe { js_get_named_property(self.0.env, self.0.ptr, key.as_ptr(), &mut ptr) };
 
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(T::from(Value {
-                env: self.0.env,
-                ptr,
-            }))
-        }
+        js_check_status!(env, status);
+
+        Ok(T::from(Value { env: env.ptr, ptr }))
     }
 
     pub fn has_named_property<T>(&self, name: &str) -> Result<bool> {
+        let env = Env::from(self.0.env);
+
         let key = CString::new(name).unwrap();
 
         let mut result = false;
@@ -405,27 +417,25 @@ impl Object {
         let status =
             unsafe { js_has_named_property(self.0.env, self.0.ptr, key.as_ptr(), &mut result) };
 
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(result)
-        }
+        js_check_status!(env, status);
+
+        Ok(result)
     }
 
     pub fn set_named_property<T>(&mut self, name: &str, value: T) -> Result<()>
     where
         T: Into<*mut js_value_t>,
     {
+        let env = Env::from(self.0.env);
+
         let key = CString::new(name).unwrap();
 
         let status =
             unsafe { js_set_named_property(self.0.env, self.0.ptr, key.as_ptr(), T::into(value)) };
 
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(())
-        }
+        js_check_status!(env, status);
+
+        Ok(())
     }
 }
 
@@ -441,6 +451,7 @@ impl From<Value> for Object {
     }
 }
 
+#[derive(Debug)]
 pub struct Callback {
     env: *mut js_env_t,
     args: Vec<*mut js_value_t>,
@@ -473,18 +484,28 @@ impl Callback {
     }
 }
 
+#[derive(Debug)]
 pub struct Function(Value);
 
 impl Function {
     pub fn new<F, R>(env: &Env, function: F) -> Result<Self>
     where
-        F: FnMut(&Env, &Callback) -> R,
+        F: FnMut(&Env, &Callback) -> Result<R>,
         R: Into<*mut js_value_t>,
     {
         let mut function = function;
 
         let closure: Box<dyn FnMut(&Env, &Callback) -> *mut js_value_t> =
-            Box::new(move |env, info| function(env, info).into());
+            Box::new(move |env, info| match function(env, info) {
+                Ok(result) => result.into(),
+                Err(error) => {
+                    unsafe {
+                        js_throw(env.ptr, error.ptr);
+                    }
+
+                    ptr::null_mut()
+                }
+            });
 
         let data = Box::into_raw(Box::new(closure)) as *mut _;
 
@@ -501,9 +522,7 @@ impl Function {
             )
         };
 
-        if status != 0 {
-            return Err(status);
-        }
+        js_check_status!(env, status);
 
         unsafe {
             js_add_finalizer(
@@ -582,6 +601,7 @@ impl From<Value> for Function {
     }
 }
 
+#[derive(Debug)]
 pub struct ArrayBuffer(Value);
 
 impl ArrayBuffer {
@@ -590,11 +610,9 @@ impl ArrayBuffer {
 
         let status = unsafe { js_create_arraybuffer(env.ptr, len, ptr::null_mut(), &mut ptr) };
 
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
-        }
+        js_check_status!(env, status);
+
+        Ok(Self(Value { env: env.ptr, ptr }))
     }
 
     pub fn as_slice(&self) -> &[u8] {
@@ -630,6 +648,7 @@ pub trait TypedArray<T> {
     fn as_mut_slice(&self) -> &mut [T];
 }
 
+#[derive(Debug)]
 pub struct Uint8Array(Value);
 
 impl Uint8Array {
@@ -649,11 +668,9 @@ impl Uint8Array {
             )
         };
 
-        if status != 0 {
-            Err(status)
-        } else {
-            Ok(Self(Value { env: env.ptr, ptr }))
-        }
+        js_check_status!(env, status);
+
+        Ok(Self(Value { env: env.ptr, ptr }))
     }
 }
 

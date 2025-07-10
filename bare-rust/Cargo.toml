@@ -1,10 +1,10 @@
 [package]
 name = "bare-rust"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2024"
 license = "Apache-2.0"
 description = "Rust bindings for Bare"
 repository = "https://github.com/holepunchto/bare-rust"
 
 [dependencies]
-bare-rust-ffi = { path = "../bare-rust-ffi", version = "0" }
+bare-rust-ffi = { path = "../bare-rust-ffi", version = "0.0.2" }
