@@ -10,7 +10,7 @@ use ffi::*;
 macro_rules! check_status {
     ($env:expr, $status:expr) => {
         if $status == JS_PENDING_EXCEPTION {
-            return Err($env.pending_exception().unwrap());
+            return Err($env.pending_exception());
         } else if $status != 0 {
             panic!("Uncaught JavaScript exception");
         }
@@ -25,18 +25,24 @@ pub struct Env {
 }
 
 impl Env {
-    pub fn pending_exception(&self) -> Option<Value> {
+    pub fn is_exception_pending(&self) -> bool {
+        let mut result = false;
+
+        unsafe {
+            js_is_exception_pending(self.ptr, &mut result);
+        }
+
+        result
+    }
+
+    pub fn pending_exception(&self) -> Value {
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
         unsafe {
             js_get_and_clear_last_exception(self.ptr, &mut ptr);
         }
 
-        if ptr.is_null() {
-            None
-        } else {
-            Some(Value { env: self.ptr, ptr })
-        }
+        Value { env: self.ptr, ptr }
     }
 }
 
