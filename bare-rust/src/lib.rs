@@ -473,7 +473,7 @@ impl Object {
 
         check_status!(env, status);
 
-        Ok(T::from(Value { env: env.ptr, ptr }))
+        Ok(Value { env: env.ptr, ptr }.into())
     }
 
     pub fn get_named_property<T>(&self, name: &str) -> Result<T>
@@ -491,7 +491,7 @@ impl Object {
 
         check_status!(env, status);
 
-        Ok(T::from(Value { env: env.ptr, ptr }))
+        Ok(Value { env: env.ptr, ptr }.into())
     }
 
     pub fn get_element<T>(&self, index: u32) -> Result<T>
@@ -506,7 +506,7 @@ impl Object {
 
         check_status!(env, status);
 
-        Ok(T::from(Value { env: env.ptr, ptr }))
+        Ok(Value { env: env.ptr, ptr }.into())
     }
 
     pub fn has_property<N>(&self, name: N) -> Result<bool>
@@ -694,7 +694,7 @@ impl Array {
 
         check_status!(env, status);
 
-        Ok(T::from(Value { env: env.ptr, ptr }))
+        Ok(Value { env: env.ptr, ptr }.into())
     }
 
     pub fn set<T>(&mut self, index: u32, value: T) -> Result<()>
@@ -726,10 +726,13 @@ impl Callback {
         T: From<Value>,
     {
         if i < self.args.len() {
-            Some(T::from(Value {
-                env: self.env,
-                ptr: self.args[i],
-            }))
+            Some(
+                Value {
+                    env: self.env,
+                    ptr: self.args[i],
+                }
+                .into(),
+            )
         } else {
             None
         }
@@ -739,10 +742,11 @@ impl Callback {
     where
         T: From<Value>,
     {
-        T::from(Value {
+        Value {
             env: self.env,
             ptr: self.receiver,
-        })
+        }
+        .into()
     }
 }
 
