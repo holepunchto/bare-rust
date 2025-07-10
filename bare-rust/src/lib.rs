@@ -106,7 +106,9 @@ impl From<Boolean> for bool {
     fn from(boolean: Boolean) -> Self {
         let mut value = false;
 
-        unsafe { js_get_value_bool(boolean.0.env, boolean.0.ptr, &mut value); }
+        unsafe {
+            js_get_value_bool(boolean.0.env, boolean.0.ptr, &mut value);
+        }
 
         value
     }
@@ -180,7 +182,9 @@ impl From<Number> for i32 {
     fn from(number: Number) -> Self {
         let mut value = 0;
 
-        unsafe { js_get_value_int32(number.0.env, number.0.ptr, &mut value); }
+        unsafe {
+            js_get_value_int32(number.0.env, number.0.ptr, &mut value);
+        }
 
         value
     }
@@ -190,7 +194,9 @@ impl From<Number> for u32 {
     fn from(number: Number) -> Self {
         let mut value = 0;
 
-        unsafe { js_get_value_uint32(number.0.env, number.0.ptr, &mut value); }
+        unsafe {
+            js_get_value_uint32(number.0.env, number.0.ptr, &mut value);
+        }
 
         value
     }
@@ -200,7 +206,9 @@ impl From<Number> for i64 {
     fn from(number: Number) -> Self {
         let mut value = 0;
 
-        unsafe { js_get_value_int64(number.0.env, number.0.ptr, &mut value); }
+        unsafe {
+            js_get_value_int64(number.0.env, number.0.ptr, &mut value);
+        }
 
         value
     }
@@ -210,7 +218,9 @@ impl From<Number> for f64 {
     fn from(number: Number) -> Self {
         let mut value = 0.0;
 
-        unsafe { js_get_value_double(number.0.env, number.0.ptr, &mut value); }
+        unsafe {
+            js_get_value_double(number.0.env, number.0.ptr, &mut value);
+        }
 
         value
     }
@@ -223,6 +233,70 @@ impl From<Number> for *mut js_value_t {
 }
 
 impl From<Value> for Number {
+    fn from(value: Value) -> Self {
+        Self(value)
+    }
+}
+
+pub struct BigInt(pub Value);
+
+impl BigInt {
+    pub fn with_i64(env: &Env, value: i64) -> Result<Self> {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_create_bigint_int64(env.ptr, value, &mut ptr) };
+
+        if status != 0 {
+            Err(status)
+        } else {
+            Ok(Self(Value { env: env.ptr, ptr }))
+        }
+    }
+
+    pub fn with_u64(env: &Env, value: u64) -> Result<Self> {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_create_bigint_uint64(env.ptr, value, &mut ptr) };
+
+        if status != 0 {
+            Err(status)
+        } else {
+            Ok(Self(Value { env: env.ptr, ptr }))
+        }
+    }
+}
+
+impl From<BigInt> for i64 {
+    fn from(bigint: BigInt) -> Self {
+        let mut value = 0;
+
+        unsafe {
+            js_get_value_bigint_int64(bigint.0.env, bigint.0.ptr, &mut value, ptr::null_mut());
+        }
+
+        value
+    }
+}
+
+impl From<BigInt> for u64 {
+    fn from(bigint: BigInt) -> Self {
+        let mut value = 0;
+
+        unsafe {
+            js_get_value_bigint_uint64(bigint.0.env, bigint.0.ptr, &mut value, ptr::null_mut());
+        }
+
+        value
+    }
+}
+
+impl From<BigInt> for *mut js_value_t {
+    fn from(bigint: BigInt) -> Self {
+        bigint.0.ptr
+    }
+}
+
+impl From<Value> for BigInt {
     fn from(value: Value) -> Self {
         Self(value)
     }
