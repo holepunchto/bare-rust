@@ -54,6 +54,71 @@ impl From<*mut js_env_t> for Env {
 }
 
 #[derive(Debug)]
+pub struct Scope {
+    env: *mut js_env_t,
+    ptr: *mut js_handle_scope_t,
+}
+
+impl Scope {
+    pub fn new(env: &Env) -> Self {
+        let mut ptr: *mut js_handle_scope_t = ptr::null_mut();
+
+        unsafe {
+            js_open_handle_scope(env.ptr, &mut ptr);
+        }
+
+        Self { env: env.ptr, ptr }
+    }
+}
+
+impl Drop for Scope {
+    fn drop(&mut self) {
+        unsafe {
+            js_close_handle_scope(self.env, self.ptr);
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct EscapableScope {
+    env: *mut js_env_t,
+    ptr: *mut js_escapable_handle_scope_t,
+}
+
+impl EscapableScope {
+    pub fn new(env: &Env) -> Self {
+        let mut ptr: *mut js_escapable_handle_scope_t = ptr::null_mut();
+
+        unsafe {
+            js_open_escapable_handle_scope(env.ptr, &mut ptr);
+        }
+
+        Self { env: env.ptr, ptr }
+    }
+
+    pub fn escape<T>(self, escapee: T) -> Value
+    where
+        T: Into<*mut js_value_t>,
+    {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        unsafe {
+            js_escape_handle(self.env, self.ptr, escapee.into(), &mut ptr);
+        }
+
+        Value { env: self.env, ptr }
+    }
+}
+
+impl Drop for EscapableScope {
+    fn drop(&mut self) {
+        unsafe {
+            js_close_escapable_handle_scope(self.env, self.ptr);
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Value {
     env: *mut js_env_t,
     ptr: *mut js_value_t,
