@@ -475,6 +475,21 @@ impl Object {
         Ok(T::from(Value { env: env.ptr, ptr }))
     }
 
+    pub fn get_element<T>(&self, index: u32) -> Result<T>
+    where
+        T: From<Value>,
+    {
+        let env = Env::from(self.0.env);
+
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_get_element(self.0.env, self.0.ptr, index, &mut ptr) };
+
+        check_status!(env, status);
+
+        Ok(T::from(Value { env: env.ptr, ptr }))
+    }
+
     pub fn has_property<N>(&self, name: N) -> Result<bool>
     where
         N: Into<Name>,
@@ -525,6 +540,18 @@ impl Object {
         Ok(result)
     }
 
+    pub fn has_element(&self, index: u32) -> Result<bool> {
+        let env = Env::from(self.0.env);
+
+        let mut result = false;
+
+        let status = unsafe { js_has_element(self.0.env, self.0.ptr, index, &mut result) };
+
+        check_status!(env, status);
+
+        Ok(result)
+    }
+
     pub fn set_property<N, T>(&mut self, name: N, value: T) -> Result<()>
     where
         N: Into<Name>,
@@ -555,6 +582,63 @@ impl Object {
         check_status!(env, status);
 
         Ok(())
+    }
+
+    pub fn set_element<T>(&mut self, index: u32, value: T) -> Result<()>
+    where
+        T: Into<*mut js_value_t>,
+    {
+        let env = Env::from(self.0.env);
+
+        let status = unsafe { js_set_element(self.0.env, self.0.ptr, index, T::into(value)) };
+
+        check_status!(env, status);
+
+        Ok(())
+    }
+
+    pub fn delete_property<N>(&self, name: N) -> Result<bool>
+    where
+        N: Into<Name>,
+    {
+        let env = Env::from(self.0.env);
+
+        let name = N::into(name);
+
+        let mut result = false;
+
+        let status = unsafe { js_delete_property(self.0.env, self.0.ptr, name.0.ptr, &mut result) };
+
+        check_status!(env, status);
+
+        Ok(result)
+    }
+
+    pub fn delete_named_property(&self, name: &str) -> Result<bool> {
+        let env = Env::from(self.0.env);
+
+        let key = CString::new(name).unwrap();
+
+        let mut result = false;
+
+        let status =
+            unsafe { js_delete_named_property(self.0.env, self.0.ptr, key.as_ptr(), &mut result) };
+
+        check_status!(env, status);
+
+        Ok(result)
+    }
+
+    pub fn delete_element(&self, index: u32) -> Result<bool> {
+        let env = Env::from(self.0.env);
+
+        let mut result = false;
+
+        let status = unsafe { js_delete_element(self.0.env, self.0.ptr, index, &mut result) };
+
+        check_status!(env, status);
+
+        Ok(result)
     }
 }
 
