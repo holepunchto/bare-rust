@@ -98,12 +98,12 @@ impl EscapableScope {
 
     pub fn escape<T>(self, escapee: T) -> Value
     where
-        T: Into<*mut js_value_t>,
+        T: Into<Value>,
     {
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
         unsafe {
-            js_escape_handle(self.env, self.ptr, escapee.into(), &mut ptr);
+            js_escape_handle(self.env, self.ptr, escapee.into().ptr, &mut ptr);
         }
 
         Value { env: self.env, ptr }
@@ -571,12 +571,12 @@ impl Object {
     pub fn set_property<N, T>(&mut self, name: N, value: T) -> Result<()>
     where
         N: Into<Name>,
-        T: Into<*mut js_value_t>,
+        T: Into<Value>,
     {
         let env = Env::from(self.0.env);
 
         let status =
-            unsafe { js_set_property(self.0.env, self.0.ptr, name.into().0.ptr, value.into()) };
+            unsafe { js_set_property(self.0.env, self.0.ptr, name.into().0.ptr, value.into().ptr) };
 
         check_status!(env, status);
 
@@ -585,14 +585,15 @@ impl Object {
 
     pub fn set_named_property<T>(&mut self, name: &str, value: T) -> Result<()>
     where
-        T: Into<*mut js_value_t>,
+        T: Into<Value>,
     {
         let env = Env::from(self.0.env);
 
         let key = CString::new(name).unwrap();
 
-        let status =
-            unsafe { js_set_named_property(self.0.env, self.0.ptr, key.as_ptr(), value.into()) };
+        let status = unsafe {
+            js_set_named_property(self.0.env, self.0.ptr, key.as_ptr(), value.into().ptr)
+        };
 
         check_status!(env, status);
 
@@ -601,11 +602,11 @@ impl Object {
 
     pub fn set_element<T>(&mut self, index: u32, value: T) -> Result<()>
     where
-        T: Into<*mut js_value_t>,
+        T: Into<Value>,
     {
         let env = Env::from(self.0.env);
 
-        let status = unsafe { js_set_element(self.0.env, self.0.ptr, index, value.into()) };
+        let status = unsafe { js_set_element(self.0.env, self.0.ptr, index, value.into().ptr) };
 
         check_status!(env, status);
 
@@ -699,11 +700,11 @@ impl Array {
 
     pub fn set<T>(&mut self, index: u32, value: T) -> Result<()>
     where
-        T: Into<*mut js_value_t>,
+        T: Into<Value>,
     {
         let env = Env::from(self.0.env);
 
-        let status = unsafe { js_set_element(self.0.env, self.0.ptr, index, value.into()) };
+        let status = unsafe { js_set_element(self.0.env, self.0.ptr, index, value.into().ptr) };
 
         check_status!(env, status);
 
