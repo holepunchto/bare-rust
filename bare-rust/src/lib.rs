@@ -318,6 +318,56 @@ impl From<Value> for BigInt {
 }
 
 #[derive(Debug)]
+pub struct Name(Value);
+
+impl From<Name> for *mut js_value_t {
+    fn from(name: Name) -> Self {
+        name.0.ptr
+    }
+}
+
+impl From<String> for Name {
+    fn from(string: String) -> Self {
+        Name(string.0)
+    }
+}
+
+impl From<Symbol> for Name {
+    fn from(symbol: Symbol) -> Self {
+        Name(symbol.0)
+    }
+}
+
+#[derive(Debug)]
+pub struct Symbol(Value);
+
+impl Symbol {
+    pub fn new(env: &Env, description: &str) -> Result<Self> {
+        let description = String::new(env, description)?;
+
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_create_symbol(env.ptr, description.0.ptr, &mut ptr) };
+
+        check_status!(env, status);
+
+        Ok(Self(Value { env: env.ptr, ptr }))
+    }
+}
+
+impl From<Symbol> for *mut js_value_t {
+    fn from(symbol: Symbol) -> Self {
+        symbol.0.ptr
+    }
+}
+
+impl From<Value> for Symbol {
+    fn from(value: Value) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Debug)]
 pub struct String(Value);
 
 impl String {
@@ -389,6 +439,24 @@ impl Object {
         Ok(Self(Value { env: env.ptr, ptr }))
     }
 
+    pub fn get_property<N, T>(&self, name: N) -> Result<T>
+    where
+        N: Into<Name>,
+        T: From<Value>,
+    {
+        let env = Env::from(self.0.env);
+
+        let name = N::into(name);
+
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe { js_get_property(self.0.env, self.0.ptr, name.0.ptr, &mut ptr) };
+
+        check_status!(env, status);
+
+        Ok(T::from(Value { env: env.ptr, ptr }))
+    }
+
     pub fn get_named_property<T>(&self, name: &str) -> Result<T>
     where
         T: From<Value>,
@@ -407,7 +475,42 @@ impl Object {
         Ok(T::from(Value { env: env.ptr, ptr }))
     }
 
-    pub fn has_named_property<T>(&self, name: &str) -> Result<bool> {
+    pub fn has_property<N>(&self, name: N) -> Result<bool>
+    where
+        N: Into<Name>,
+    {
+        let env = Env::from(self.0.env);
+
+        let name = N::into(name);
+
+        let mut result = false;
+
+        let status = unsafe { js_has_property(self.0.env, self.0.ptr, name.0.ptr, &mut result) };
+
+        check_status!(env, status);
+
+        Ok(result)
+    }
+
+    pub fn has_own_property<N>(&self, name: N) -> Result<bool>
+    where
+        N: Into<Name>,
+    {
+        let env = Env::from(self.0.env);
+
+        let name = N::into(name);
+
+        let mut result = false;
+
+        let status =
+            unsafe { js_has_own_property(self.0.env, self.0.ptr, name.0.ptr, &mut result) };
+
+        check_status!(env, status);
+
+        Ok(result)
+    }
+
+    pub fn has_named_property(&self, name: &str) -> Result<bool> {
         let env = Env::from(self.0.env);
 
         let key = CString::new(name).unwrap();
@@ -420,6 +523,22 @@ impl Object {
         check_status!(env, status);
 
         Ok(result)
+    }
+
+    pub fn set_property<N, T>(&mut self, name: N, value: T) -> Result<()>
+    where
+        N: Into<Name>,
+        T: Into<*mut js_value_t>,
+    {
+        let env = Env::from(self.0.env);
+
+        let name = N::into(name);
+
+        let status = unsafe { js_set_property(self.0.env, self.0.ptr, name.0.ptr, T::into(value)) };
+
+        check_status!(env, status);
+
+        Ok(())
     }
 
     pub fn set_named_property<T>(&mut self, name: &str, value: T) -> Result<()>
