@@ -59,7 +59,7 @@ impl From<Value> for *mut js_value_t {
 }
 
 #[derive(Debug)]
-pub struct Undefined(pub Value);
+pub struct Undefined(Value);
 
 impl Undefined {
     pub fn new(env: &Env) -> Self {
@@ -86,7 +86,7 @@ impl From<Value> for Undefined {
 }
 
 #[derive(Debug)]
-pub struct Null(pub Value);
+pub struct Null(Value);
 
 impl Null {
     pub fn new(env: &Env) -> Self {
@@ -113,7 +113,7 @@ impl From<Value> for Null {
 }
 
 #[derive(Debug)]
-pub struct Boolean(pub Value);
+pub struct Boolean(Value);
 
 impl Boolean {
     pub fn new(env: &Env, value: bool) -> Self {
@@ -152,7 +152,7 @@ impl From<Value> for Boolean {
 }
 
 #[derive(Debug)]
-pub struct Number(pub Value);
+pub struct Number(Value);
 
 impl Number {
     pub fn with_i32(env: &Env, value: i32) -> Self {
@@ -257,7 +257,7 @@ impl From<Value> for Number {
 }
 
 #[derive(Debug)]
-pub struct BigInt(pub Value);
+pub struct BigInt(Value);
 
 impl BigInt {
     pub fn with_i64(env: &Env, value: i64) -> Self {
@@ -318,7 +318,7 @@ impl From<Value> for BigInt {
 }
 
 #[derive(Debug)]
-pub struct String(pub Value);
+pub struct String(Value);
 
 impl String {
     pub fn new(env: &Env, value: &str) -> Result<Self> {
@@ -376,7 +376,7 @@ impl From<Value> for String {
 }
 
 #[derive(Debug)]
-pub struct Object(pub Value);
+pub struct Object(Value);
 
 impl Object {
     pub fn new(env: &Env) -> Result<Self> {
@@ -648,72 +648,89 @@ pub trait TypedArray<T> {
     fn as_mut_slice(&self) -> &mut [T];
 }
 
-#[derive(Debug)]
-pub struct Uint8Array(Value);
+macro_rules! define_typedarray {
+    ($name:ident, $type:ident, $kind:ident) => {
+        #[derive(Debug)]
+        pub struct $name(Value);
 
-impl Uint8Array {
-    pub fn new(env: &Env, len: usize) -> Result<Self> {
-        let arraybuffer = ArrayBuffer::new(env, len)?;
+        impl $name {
+            pub fn new(env: &Env, len: usize) -> Result<Self> {
+                let arraybuffer = ArrayBuffer::new(env, len * size_of::<$type>())?;
 
-        let mut ptr: *mut js_value_t = ptr::null_mut();
+                let mut ptr: *mut js_value_t = ptr::null_mut();
 
-        let status = unsafe {
-            js_create_typedarray(
-                env.ptr,
-                js_typedarray_type_t::js_uint8array,
-                len,
-                arraybuffer.0.ptr,
-                0,
-                &mut ptr,
-            )
-        };
+                let status = unsafe {
+                    js_create_typedarray(
+                        env.ptr,
+                        js_typedarray_type_t::$kind,
+                        len,
+                        arraybuffer.0.ptr,
+                        0,
+                        &mut ptr,
+                    )
+                };
 
-        check_status!(env, status);
+                check_status!(env, status);
 
-        Ok(Self(Value { env: env.ptr, ptr }))
-    }
-}
-
-impl TypedArray<u8> for Uint8Array {
-    fn as_slice(&self) -> &[u8] {
-        self.as_mut_slice()
-    }
-
-    fn as_mut_slice(&self) -> &mut [u8] {
-        let mut len: usize = 0;
-        let mut data: *mut c_void = ptr::null_mut();
-
-        unsafe {
-            js_get_typedarray_info(
-                self.0.env,
-                self.0.ptr,
-                ptr::null_mut(),
-                &mut data,
-                &mut len,
-                ptr::null_mut(),
-                ptr::null_mut(),
-            );
+                Ok(Self(Value { env: env.ptr, ptr }))
+            }
         }
 
-        unsafe { slice::from_raw_parts_mut(data as *mut u8, len) }
-    }
+        impl TypedArray<$type> for $name {
+            fn as_slice(&self) -> &[$type] {
+                self.as_mut_slice()
+            }
+
+            fn as_mut_slice(&self) -> &mut [$type] {
+                let mut len: usize = 0;
+                let mut data: *mut c_void = ptr::null_mut();
+
+                unsafe {
+                    js_get_typedarray_info(
+                        self.0.env,
+                        self.0.ptr,
+                        ptr::null_mut(),
+                        &mut data,
+                        &mut len,
+                        ptr::null_mut(),
+                        ptr::null_mut(),
+                    );
+                }
+
+                unsafe { slice::from_raw_parts_mut(data as *mut $type, len) }
+            }
+        }
+
+        impl From<$name> for *mut js_value_t {
+            fn from(typedarray: $name) -> Self {
+                typedarray.0.ptr
+            }
+        }
+
+        impl From<Value> for $name {
+            fn from(value: Value) -> Self {
+                Self(value)
+            }
+        }
+    };
 }
 
-impl From<Uint8Array> for *mut js_value_t {
-    fn from(uint8array: Uint8Array) -> Self {
-        uint8array.0.ptr
-    }
-}
-
-impl From<Value> for Uint8Array {
-    fn from(value: Value) -> Self {
-        Self(value)
-    }
-}
+define_typedarray!(Int8Array, i8, js_int8array);
+define_typedarray!(Uint8Array, u8, js_uint8array);
+define_typedarray!(Uint8ClampedArray, u8, js_uint8clampedarray);
+define_typedarray!(Int16Array, i16, js_int16array);
+define_typedarray!(Uint16Array, u16, js_uint16array);
+define_typedarray!(Int32Array, i32, js_int32array);
+define_typedarray!(Uint32Array, u32, js_uint32array);
+define_typedarray!(Float32Array, f32, js_float32array);
+define_typedarray!(Float64Array, f64, js_float64array);
+define_typedarray!(BigInt64Array, i32, js_bigint64array);
+define_typedarray!(BigUint64Array, u32, js_biguint64array);
 
 macro_rules! define_error {
     ($name:ident, $create:ident) => {
-        pub struct $name(pub Value);
+        #[derive(Debug)]
+        pub struct $name(Value);
 
         impl $name {
             pub fn new(env: &Env, message: &str) -> Self {
