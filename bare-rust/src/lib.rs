@@ -774,7 +774,7 @@ impl Function {
             }
         }
 
-        let closure: &mut Box<dyn FnMut(&Env, &Callback) -> *mut js_value_t> =
+        let closure =
             unsafe { &mut *(data as *mut Box<dyn FnMut(&Env, &Callback) -> *mut js_value_t>) };
 
         return closure(
@@ -788,7 +788,9 @@ impl Function {
     }
 
     extern "C" fn drop(_: *mut js_env_t, data: *mut c_void, _: *mut c_void) -> () {
-        let _: Box<Box<dyn FnMut(&Env, &Callback)>> = unsafe { Box::from_raw(data as *mut _) };
+        unsafe {
+            drop(Box::from_raw(data));
+        }
     }
 }
 
