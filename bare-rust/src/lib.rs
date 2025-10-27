@@ -8,12 +8,18 @@ pub use bare_rust_ffi as ffi;
 
 use ffi::*;
 
+macro_rules! assert_status {
+    ($status:expr, $message:expr) => {
+        assert!($status == 0, $message);
+    };
+}
+
 macro_rules! check_status {
     ($env:expr, $status:expr) => {
         if $status == JS_PENDING_EXCEPTION {
             return Err($env.pending_exception());
-        } else if $status != 0 {
-            panic!("Uncaught JavaScript exception");
+        } else {
+            assert_status!($status, "Uncaught JavaScript exception");
         }
     };
 }
@@ -49,7 +55,7 @@ impl Env {
 
 impl From<*mut js_env_t> for Env {
     fn from(ptr: *mut js_env_t) -> Self {
-        return Self { ptr };
+        Self { ptr }
     }
 }
 
@@ -114,6 +120,100 @@ impl Drop for EscapableScope {
     fn drop(&mut self) {
         unsafe {
             js_close_escapable_handle_scope(self.env, self.ptr);
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Ref {
+    env: *mut js_env_t,
+    ptr: *mut js_ref_t,
+}
+
+impl Ref {
+    pub fn new<T>(env: &Env, value: T) -> Self
+    where
+        T: Into<Value>,
+    {
+        let mut ptr: *mut js_ref_t = ptr::null_mut();
+
+        unsafe {
+            js_create_reference(env.ptr, value.into().ptr, 1, &mut ptr);
+        }
+
+        Ref { env: env.ptr, ptr }
+    }
+
+    pub fn get<T>(&self) -> T
+    where
+        T: From<Value>,
+    {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        unsafe {
+            js_get_reference_value(self.env, self.ptr, &mut ptr);
+        }
+
+        Value { env: self.env, ptr }.into()
+    }
+}
+
+impl Drop for Ref {
+    fn drop(&mut self) {
+        unsafe {
+            js_delete_reference(self.env, self.ptr);
+        }
+    }
+}
+
+impl From<Ref> for Value {
+    fn from(reference: Ref) -> Self {
+        reference.get()
+    }
+}
+
+#[derive(Debug)]
+pub struct WeakRef {
+    env: *mut js_env_t,
+    ptr: *mut js_ref_t,
+}
+
+impl WeakRef {
+    pub fn new<T>(env: &Env, value: T) -> Self
+    where
+        T: Into<Value>,
+    {
+        let mut ptr: *mut js_ref_t = ptr::null_mut();
+
+        unsafe {
+            js_create_reference(env.ptr, value.into().ptr, 0, &mut ptr);
+        }
+
+        WeakRef { env: env.ptr, ptr }
+    }
+
+    pub fn get<T>(&self) -> Option<T>
+    where
+        T: From<Value>,
+    {
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        unsafe {
+            js_get_reference_value(self.env, self.ptr, &mut ptr);
+        }
+
+        if ptr.is_null() {
+            None
+        } else {
+            Some(Value { env: self.env, ptr }.into())
+        }
+    }
+}
+
+impl Drop for WeakRef {
+    fn drop(&mut self) {
+        unsafe {
+            js_delete_reference(self.env, self.ptr);
         }
     }
 }
@@ -441,7 +541,7 @@ value_conversions!(String);
 
 impl From<String> for string::String {
     fn from(string: String) -> Self {
-        return string::String::from_utf8(string.to_bytes()).unwrap();
+        unsafe { string::String::from_utf8_unchecked(string.to_bytes()) }
     }
 }
 
@@ -727,16 +827,21 @@ impl Callback {
         T: From<Value>,
     {
         if i < self.args.len() {
-            Some(
-                Value {
-                    env: self.env,
-                    ptr: self.args[i],
-                }
-                .into(),
-            )
+            Some(self.arg_unchecked(i))
         } else {
             None
         }
+    }
+
+    pub fn arg_unchecked<T>(&self, i: usize) -> T
+    where
+        T: From<Value>,
+    {
+        Value {
+            env: self.env,
+            ptr: self.args[i],
+        }
+        .into()
     }
 
     pub fn receiver<T>(&self) -> T
@@ -822,9 +927,9 @@ impl Function {
 
         let mut args = Vec::new();
 
-        args.resize(len, ptr::null_mut());
-
         if len > 0 {
+            args.resize(len, ptr::null_mut());
+
             unsafe {
                 js_get_callback_info(
                     env,
@@ -840,14 +945,14 @@ impl Function {
         let closure =
             unsafe { &mut *(data as *mut Box<dyn FnMut(&Env, &Callback) -> *mut js_value_t>) };
 
-        return closure(
+        closure(
             &Env::from(env),
             &Callback {
                 env,
                 args,
                 receiver,
             },
-        );
+        )
     }
 
     extern "C" fn drop(_: *mut js_env_t, data: *mut c_void, _: *mut c_void) -> () {
@@ -874,10 +979,17 @@ impl ArrayBuffer {
     }
 
     pub fn as_slice(&self) -> &[u8] {
-        self.as_mut_slice()
+        let mut len: usize = 0;
+        let mut data: *mut c_void = ptr::null_mut();
+
+        unsafe {
+            js_get_arraybuffer_info(self.0.env, self.0.ptr, &mut data, &mut len);
+        }
+
+        unsafe { slice::from_raw_parts(data as *const u8, len) }
     }
 
-    pub fn as_mut_slice(&self) -> &mut [u8] {
+    pub fn as_mut_slice(&mut self) -> &mut [u8] {
         let mut len: usize = 0;
         let mut data: *mut c_void = ptr::null_mut();
 
@@ -887,13 +999,47 @@ impl ArrayBuffer {
 
         unsafe { slice::from_raw_parts_mut(data as *mut u8, len) }
     }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        self.as_slice().to_vec()
+    }
+
+    pub fn copy_from_slice(&mut self, slice: &[u8]) {
+        self.as_mut_slice().copy_from_slice(slice)
+    }
+
+    pub fn clone_from_slice(&mut self, slice: &[u8]) {
+        self.as_mut_slice().clone_from_slice(slice)
+    }
 }
 
 value_conversions!(ArrayBuffer);
 
 pub trait TypedArray<T> {
     fn as_slice(&self) -> &[T];
-    fn as_mut_slice(&self) -> &mut [T];
+
+    fn as_mut_slice(&mut self) -> &mut [T];
+
+    fn to_vec(&self) -> Vec<T>
+    where
+        T: Clone,
+    {
+        self.as_slice().to_vec()
+    }
+
+    fn copy_from_slice(&mut self, slice: &[T])
+    where
+        T: Copy,
+    {
+        self.as_mut_slice().copy_from_slice(slice)
+    }
+
+    fn clone_from_slice(&mut self, slice: &[T])
+    where
+        T: Clone,
+    {
+        self.as_mut_slice().clone_from_slice(slice)
+    }
 }
 
 macro_rules! define_typedarray {
@@ -922,14 +1068,37 @@ macro_rules! define_typedarray {
 
                 Ok(Self(Value { env: env.ptr, ptr }))
             }
+
+            pub fn with_slice(env: &Env, slice: &[$type]) -> Result<Self> {
+                let mut typedarray = $name::new(env, slice.len())?;
+
+                typedarray.copy_from_slice(slice);
+
+                Ok(typedarray)
+            }
         }
 
         impl TypedArray<$type> for $name {
             fn as_slice(&self) -> &[$type] {
-                self.as_mut_slice()
+                let mut len: usize = 0;
+                let mut data: *mut c_void = ptr::null_mut();
+
+                unsafe {
+                    js_get_typedarray_info(
+                        self.0.env,
+                        self.0.ptr,
+                        ptr::null_mut(),
+                        &mut data,
+                        &mut len,
+                        ptr::null_mut(),
+                        ptr::null_mut(),
+                    );
+                }
+
+                unsafe { slice::from_raw_parts(data as *const $type, len) }
             }
 
-            fn as_mut_slice(&self) -> &mut [$type] {
+            fn as_mut_slice(&mut self) -> &mut [$type] {
                 let mut len: usize = 0;
                 let mut data: *mut c_void = ptr::null_mut();
 
@@ -993,3 +1162,34 @@ define_error!(TypeError, js_create_type_error);
 define_error!(RangeError, js_create_range_error);
 define_error!(SyntaxError, js_create_syntax_error);
 define_error!(ReferenceError, js_create_reference_error);
+
+#[macro_export]
+macro_rules! bare_exports {
+    ($name:ident, $exports:expr) => {
+        #[unsafe(no_mangle)]
+        pub unsafe extern "C" fn $name(
+            env: *mut $crate::ffi::js_env_t,
+            _: *mut $crate::ffi::js_value_t,
+        ) -> *mut $crate::ffi::js_value_t {
+            let result: Result<$crate::Value, $crate::Value> = $exports(crate::Env::from(env));
+
+            match result {
+                Ok(result) => result.into(),
+                Err(error) => {
+                    unsafe {
+                        $crate::ffi::js_throw(env, error.into());
+                    }
+
+                    std::ptr::null_mut()
+                }
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! bare_module {
+    ($exports:expr) => {
+        $crate::bare_exports!(bare_register_module_v0, $exports);
+    };
+}
