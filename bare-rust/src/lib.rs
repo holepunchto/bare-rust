@@ -998,7 +998,7 @@ impl External {
 value_conversions!(External);
 
 impl<T> AsRef<T> for External {
-    fn as_ref<'a>(&'a self) -> &'a T {
+    fn as_ref(&self) -> &T {
         let mut ptr: *mut c_void = ptr::null_mut();
 
         unsafe {
@@ -1010,7 +1010,7 @@ impl<T> AsRef<T> for External {
 }
 
 impl<T> AsMut<T> for External {
-    fn as_mut<'a>(&'a mut self) -> &'a mut T {
+    fn as_mut(&mut self) -> &mut T {
         let mut ptr: *mut c_void = ptr::null_mut();
 
         unsafe {
