@@ -965,6 +965,49 @@ impl Function {
 value_conversions!(Function);
 
 #[derive(Debug)]
+pub struct External(Value);
+
+impl External {
+    pub fn new<T>(env: &Env, value: T) -> Result<Self> {
+        let data = Box::into_raw(Box::new(value)) as *mut _;
+
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe {
+            js_create_external(
+                env.ptr,
+                data,
+                Some(External::drop),
+                ptr::null_mut(),
+                &mut ptr,
+            )
+        };
+
+        check_status!(env, status);
+
+        Ok(Self(Value { env: env.ptr, ptr }))
+    }
+
+    pub fn get<T>(&self) -> *mut T {
+        let mut ptr: *mut c_void = ptr::null_mut();
+
+        unsafe {
+            js_get_value_external(self.0.env, self.0.ptr, &mut ptr);
+        }
+
+        ptr as *mut T
+    }
+
+    extern "C" fn drop(_: *mut js_env_t, data: *mut c_void, _: *mut c_void) -> () {
+        unsafe {
+            drop(Box::from_raw(data));
+        }
+    }
+}
+
+value_conversions!(External);
+
+#[derive(Debug)]
 pub struct ArrayBuffer(Value);
 
 impl ArrayBuffer {
