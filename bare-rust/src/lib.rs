@@ -988,16 +988,6 @@ impl External {
         Ok(Self(Value { env: env.ptr, ptr }))
     }
 
-    pub fn get<T>(&self) -> *mut T {
-        let mut ptr: *mut c_void = ptr::null_mut();
-
-        unsafe {
-            js_get_value_external(self.0.env, self.0.ptr, &mut ptr);
-        }
-
-        ptr as *mut T
-    }
-
     extern "C" fn drop(_: *mut js_env_t, data: *mut c_void, _: *mut c_void) -> () {
         unsafe {
             drop(Box::from_raw(data));
@@ -1006,6 +996,30 @@ impl External {
 }
 
 value_conversions!(External);
+
+impl<T> AsRef<T> for External {
+    fn as_ref<'a>(&'a self) -> &'a T {
+        let mut ptr: *mut c_void = ptr::null_mut();
+
+        unsafe {
+            js_get_value_external(self.0.env, self.0.ptr, &mut ptr);
+        }
+
+        unsafe { &*(ptr as *const T) }
+    }
+}
+
+impl<T> AsMut<T> for External {
+    fn as_mut<'a>(&'a mut self) -> &'a mut T {
+        let mut ptr: *mut c_void = ptr::null_mut();
+
+        unsafe {
+            js_get_value_external(self.0.env, self.0.ptr, &mut ptr);
+        }
+
+        unsafe { &mut *(ptr as *mut T) }
+    }
+}
 
 #[derive(Debug)]
 pub struct ArrayBuffer(Value);
