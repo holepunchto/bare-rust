@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "bare-rust"
-version = "0.0.11"
+version = "0.0.12"
 dependencies = [
  "bare-rust-ffi",
 ]
