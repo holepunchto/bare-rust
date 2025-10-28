@@ -5,6 +5,7 @@ edition = "2024"
 license = "Apache-2.0"
 description = "Rust bindings for Bare"
 repository = "https://github.com/holepunchto/bare-rust"
+documentation = "https://docs.rs/bare-rust"
 
 [dependencies]
 bare-rust-ffi = { path = "../bare-rust-ffi", version = "0.0.3" }
