@@ -968,7 +968,7 @@ value_conversions!(Function);
 pub struct External(Value);
 
 impl External {
-    pub fn new<T>(env: &Env, value: T) -> Result<Self> {
+    pub fn new<T: 'static>(env: &Env, value: T) -> Result<Self> {
         let data = Box::into_raw(Box::new(value)) as *mut _;
 
         let mut ptr: *mut js_value_t = ptr::null_mut();
