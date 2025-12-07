@@ -1,6 +1,6 @@
 [package]
 name = "bare-rust"
-version = "0.0.17"
+version = "0.0.18"
 edition = "2024"
 license = "Apache-2.0"
 description = "Rust bindings for Bare"
