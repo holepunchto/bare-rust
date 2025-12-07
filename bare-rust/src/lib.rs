@@ -909,16 +909,15 @@ impl Function {
         Ok(Self(Value { env: env.ptr, ptr }))
     }
 
-    pub fn call<T, R, U, I>(&self, receiver: R, args: I) -> Result<U>
+    pub fn call<'a, C, R, A>(&self, receiver: C, args: A) -> Result<R>
     where
-        T: Into<Value>,
-        R: Into<Value>,
-        U: From<Value>,
-        I: Iterator<Item = T>,
+        C: Into<Value>,
+        A: IntoIterator<Item = &'a Value>,
+        R: From<Value>,
     {
         let env = Env::from(self.0.env);
 
-        let mut args: Vec<_> = args.map(|value| value.into().ptr).collect();
+        let mut args: Vec<_> = args.into_iter().map(|value| value.ptr).collect();
 
         let mut ptr: *mut js_value_t = ptr::null_mut();
 
