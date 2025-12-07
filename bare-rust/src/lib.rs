@@ -887,7 +887,7 @@ impl Function {
                 env.ptr,
                 ptr::null_mut(),
                 0,
-                Some(Function::call),
+                Some(Function::apply),
                 data,
                 &mut ptr,
             )
@@ -909,7 +909,36 @@ impl Function {
         Ok(Self(Value { env: env.ptr, ptr }))
     }
 
-    extern "C" fn call(env: *mut js_env_t, info: *mut js_callback_info_t) -> *mut js_value_t {
+    pub fn call<T, R, U, I>(&self, receiver: R, args: I) -> Result<U>
+    where
+        T: Into<Value>,
+        R: Into<Value>,
+        U: From<Value>,
+        I: Iterator<Item = T>,
+    {
+        let env = Env::from(self.0.env);
+
+        let mut args: Vec<_> = args.map(|value| value.into().ptr).collect();
+
+        let mut ptr: *mut js_value_t = ptr::null_mut();
+
+        let status = unsafe {
+            js_call_function(
+                env.ptr,
+                receiver.into().ptr,
+                self.0.ptr,
+                args.len(),
+                args.as_mut_ptr(),
+                &mut ptr,
+            )
+        };
+
+        check_status!(env, status);
+
+        Ok(Value { env: env.ptr, ptr }.into())
+    }
+
+    extern "C" fn apply(env: *mut js_env_t, info: *mut js_callback_info_t) -> *mut js_value_t {
         let mut len: usize = 0;
         let mut receiver: *mut js_value_t = ptr::null_mut();
         let mut data: *mut c_void = ptr::null_mut();
